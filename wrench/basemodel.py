@@ -256,7 +256,8 @@ class BaseClassModel(BaseModel, ABC):
         if isinstance(metric_fn, str):
             metric_fn = METRIC[metric_fn]
         if y_true is None:
-            y_true = np.array(dataset.labels)
+            # y_true = np.array(dataset.labels)
+            y_true = np.squeeze(dataset[1])
         probas = self.predict_proba(dataset, **kwargs)
         return metric_fn(y_true, probas)
 
