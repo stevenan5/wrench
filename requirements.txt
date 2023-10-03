@@ -1,0 +1,2 @@
+mosek==9.3.22
+gurobipy==9.1.2
