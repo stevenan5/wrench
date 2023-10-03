@@ -10,7 +10,7 @@ from wrench.dataset import BaseDataset
 from ..utils import create_tuples
 
 
-def ebcc_vb(tuples,
+def ebcc_vb(L,
             num_items,
             num_workers,
             num_classes,
@@ -25,32 +25,45 @@ def ebcc_vb(tuples,
             eval=False,
             seed=1234,
             inference_iter=500,
-            empirical_prior=False):
+            empirical_prior=False,
+            weak: Optional[int] = None, n_weaks: Optional[int] = None,
+                        random_guess: Optional[int] = None):
 
     y_is_one_lij = []
     y_is_one_lji = []
-    for k in range(num_classes):
-        selected = (tuples[:, 2] == k)
-        coo_ij = ssp.coo_matrix((np.ones(selected.sum()),
-                                tuples[selected, :2].T),
-                                shape=(num_items, num_workers),
-                                dtype=np.bool)
+    num_classes = int(num_classes)
+    num_items = int(num_items)
+    num_rules = L.shape[1]
+    for k in range(int(num_classes)):
+        # compute which points are selected and record which rule predicted it
+        selected = [[], []]
+        for i in range(num_items):
+            for j in range(num_rules):
+                if L[i, j] == k:
+                    selected[0].append(i)
+                    selected[1].append(j)
+        coo_ij = ssp.coo_matrix((np.ones(len(selected[0])),
+                                (selected[0], selected[1])),
+                                shape=(int(num_items), num_workers),
+                                dtype=np.bool_)
+
         y_is_one_lij.append(coo_ij.tocsr())
         y_is_one_lji.append(coo_ij.T.tocsr())
 
-    beta_kl = np.eye(num_classes) * (a_v - b_v) + b_v
+    beta_kl = np.eye(int(num_classes)) * (a_v - b_v) + b_v
 
     # initialize z_ik, zg_ikm, c_ik, gamma_ik, sigma_ik
-    z_ik = np.zeros((num_items, num_classes))
-    for l in range(num_classes):
+    z_ik = np.zeros((int(num_items), int(num_classes)))
+    for l in range(int(num_classes)):
         z_ik[:, [l]] += y_is_one_lij[l].sum(axis=-1) + 1e-8
     z_ik /= z_ik.sum(axis=-1, keepdims=True)
 
     if empirical_prior:
         alpha = z_ik.sum(axis=0)
 
-    np.random.seed(seed)
-    zg_ikm = np.random.dirichlet(np.ones(num_groups), z_ik.shape) * z_ik[:, :, None]
+    # np.random.seed(seed)
+    rng = np.random.RandomState(seed)
+    zg_ikm = rng.dirichlet(np.ones(num_groups), z_ik.shape) * z_ik[:, :, None]
     for it in range(inference_iter):
         if eval is False:
             eta_km = a_pi / num_groups + zg_ikm.sum(axis=0)
@@ -87,7 +100,7 @@ def ebcc_vb(tuples,
     alpha0_jkm = mu_jkml.sum(axis=-1)
     ELBO += ((alpha0_jkm - num_classes) * digamma(alpha0_jkm) - gammaln(alpha0_jkm)).sum()
     ELBO += entropy(zg_ikm.reshape(num_items, -1).T).sum()
-    return z_ik, ELBO, eta_km, nu_k, mu_jkml
+    return z_ik, ELBO, eta_km, nu_k, mu_jkml, zg_ikm
 
 
 class EBCC(BaseLabelModel):
@@ -137,6 +150,7 @@ class EBCC(BaseLabelModel):
             'eta_km': None,
             'nu_k': None,
             'mu_jkml': None,
+            'rho_ikm': None,
         }
         self.seed = seed
         self.repeat = repeat
@@ -149,15 +163,17 @@ class EBCC(BaseLabelModel):
             verbose: Optional[bool] = False,
             *args: Any,
             **kwargs: Any):
-        tuples = create_tuples(dataset_train)
-        num_items, _, num_classes = tuples.max(axis=0) + 1
-        num_workers = len(dataset_train.weak_labels[0])
+        L = dataset_train[0]
+        num_items = L.shape[0]
+        num_classes = np.max(L) + 1
+        num_workers = int(L.shape[1])
         max_elbo = float('-inf')
-
+        # seed = np.random.randint(1e8)
+        # self.seed = seed
         if self.seed is None:
             for _ in trange(0, self.repeat, unit='epoch'):
                 seed = np.random.randint(1e8)
-                prediction, elbo, p1, p2, p3 = ebcc_vb(tuples,
+                prediction, elbo, p1, p2, p3, p4 = ebcc_vb(L,
                                                        num_items, num_workers, num_classes,
                                                        seed=seed,
                                                        **self.hyperparas)
@@ -167,12 +183,13 @@ class EBCC(BaseLabelModel):
                         'seed': seed,
                         'eta_km': p1,
                         'nu_k': p2,
-                        'mu_jkml': p3
+                        'mu_jkml': p3,
+                        'rho_ikm': p4
                     }
                     max_elbo = elbo
                     pred = prediction
         else:
-            pred, elbo, p1, p2, p3 = ebcc_vb(tuples,
+            pred, elbo, p1, p2, p3, p4 = ebcc_vb(L,
                                              num_items, num_workers, num_classes,
                                              seed=self.seed,
                                              **self.hyperparas)
@@ -181,24 +198,33 @@ class EBCC(BaseLabelModel):
                 'seed': self.seed,
                 'eta_km': p1,
                 'nu_k': p2,
-                'mu_jkml': p3
+                'mu_jkml': p3,
+                'rho_ikm': p4
             }
         return pred
 
     def predict_proba(self,
                       dataset: Union[BaseDataset, np.ndarray],
+                      weak: Optional[int] = None,
+                      n_weaks: Optional[int] = None,
+                      seed: Optional[int] = None,
+                      random_guess: Optional[int] = None,
                       **kwargs: Any):
-        tuples = create_tuples(dataset)
-        num_items, _, num_classes = tuples.max(axis=0) + 1
-        num_workers = len(dataset.weak_labels[0])
-        eval = True
+        evaluate = True
+        L = dataset[0]
+        num_items = L.shape[0]
+        num_classes = np.max(L) + 1
+        num_workers = int(L.shape[1])
 
         if self.params['nu_k'] is None or self.params['mu_jkml'] is None:
-            eval = False
+            evaluate = False
 
-        pred, elbo, _, _, _ = ebcc_vb(tuples,
+        pred, elbo, _, _, _, _ = ebcc_vb(L,
                                       num_items, num_workers, num_classes,
-                                      eval=eval,
+                                      eval=evaluate,
+                                      eta_km=self.params['eta_km'],
+                                      nu_k=self.params['nu_k'],
+                                      mu_jkml=self.params['mu_jkml'],
                                       **self.hyperparas,
-                                      **self.params)
+                                      )
         return pred
