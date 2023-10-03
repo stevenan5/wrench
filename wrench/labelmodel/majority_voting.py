@@ -33,13 +33,26 @@ class MajorityWeightedVoting(BaseLabelModel):
             assert len(balance) == n_class
 
         L = check_weak_labels(dataset_train)
+        np.random.seed(seed)
+        np.random.shuffle(L.T)
+        L = L[:, 0:n_weaks]
+        n, m = L.shape
+        r = np.random.randint(0, 2, size=(n, random_guess))
+        L = np.concatenate((L, r), axis = 1)
         if balance is None:
             self.balance = self._init_balance(L, dataset_valid, y_valid, n_class)
         else:
             self.balance = balance
 
     def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
-        L = check_weak_labels(dataset)
+        # L = check_weak_labels(dataset)
+        # np.random.seed(seed)
+        # np.random.shuffle(L.T)
+        # L = L[:, 0:n_weaks]
+        # n, m = L.shape
+        # r = np.random.randint(0, 2, size=(n, random_guess))
+        # L = np.concatenate((L, r), axis = 1)
+        L = dataset[0]
 
         n_class = len(self.balance)
         n, m = L.shape
@@ -65,6 +78,10 @@ class MajorityVoting(BaseLabelModel):
     def fit(self,
             dataset_train: Union[BaseDataset, np.ndarray],
             n_class: Optional[int] = None,
+            weak: Optional[int] = None,
+            n_weaks: Optional[int] = None,
+            seed: Optional[int] = None,
+            random_guess: Optional[int] = None,
             **kwargs: Any):
         # warnings.warn(f'MajorityVoting.fit() should not be called!')
         if isinstance(dataset_train, BaseDataset):
@@ -72,14 +89,22 @@ class MajorityVoting(BaseLabelModel):
                 assert n_class == dataset_train.n_class
             else:
                 n_class = dataset_train.n_class
-        self.n_class = n_class or int(np.max(check_weak_labels(dataset_train))) + 1
+        # self.n_class = n_class or int(np.max(check_weak_labels(dataset_train))) + 1
+        self.n_class = n_class or int(np.max(dataset_train[1]) + 1)
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], weight: Optional[np.ndarray] = None,
+
+    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], weight: Optional[np.ndarray] = None, weak: Optional[int] = None, n_weaks: Optional[int] = None, random_guess: Optional[int] = None, seed: Optional[int] = None,
                       **kwargs: Any) -> np.ndarray:
-        L = check_weak_labels(dataset)
+        # L = check_weak_labels(dataset, n_weaks=n_weaks, random_guess=random_guess, seed=seed)
+        # np.random.seed(seed)
+        # np.random.shuffle(L.T)
+        # L = L[:, 0:n_weaks]
+        # n, m = L.shape
+        # r = np.random.randint(0, 2, size=(n, random_guess))
+        # L = np.concatenate((L, r), axis = 1)
+        L = dataset[0]
         if weight is None:
             weight = np.ones_like(L)
-
         n_class = self.n_class
         n, m = L.shape
         Y_p = np.zeros((n, n_class))
@@ -87,7 +112,7 @@ class MajorityVoting(BaseLabelModel):
             counts = np.zeros(n_class)
             for j in range(m):
                 if L[i, j] != ABSTAIN:
-                    counts[L[i, j]] += 1 * weight[i, j]
+                    counts[int(L[i, j])] += 1 * weight[i, j]
             # Y_p[i, :] = np.where(counts == max(counts), 1, 0)
             if counts.sum() == 0:
                 counts += 1
