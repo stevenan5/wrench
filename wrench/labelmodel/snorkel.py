@@ -36,6 +36,10 @@ class Snorkel(BaseLabelModel):
             n_class: Optional[int] = None,
             balance: Optional[np.ndarray] = None,
             verbose: Optional[bool] = False,
+            weak: Optional[int] = None,
+            n_weaks: Optional[int] = None,
+            seed: Optional[int] = None,
+            random_guess: Optional[int] = None,
             **kwargs: Any):
 
         self._update_hyperparas(**kwargs)
@@ -47,7 +51,14 @@ class Snorkel(BaseLabelModel):
         if n_class is not None and balance is not None:
             assert len(balance) == n_class
 
-        L = check_weak_labels(dataset_train)
+        # L = check_weak_labels(dataset_train, n_weaks=n_weaks, random_guess=random_guess)
+        # np.random.seed(seed)
+        # np.random.shuffle(L.T)
+        # L = L[:, 0:n_weaks]
+        # n, m = L.shape
+        # r = np.random.randint(0, 2, size=(n, random_guess))
+        # L = np.concatenate((L, r), axis = 1)
+        L = dataset_train[0]
         if balance is None:
             balance = self._init_balance(L, dataset_valid, y_valid, n_class)
         n_class = len(balance)
@@ -65,6 +76,13 @@ class Snorkel(BaseLabelModel):
 
         self.model = label_model
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
-        L = check_weak_labels(dataset)
+    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], weak: Optional[int] = None, n_weaks: Optional[int] = None, random_guess: Optional[int] = None, seed: Optional[int] = None, **kwargs: Any) -> np.ndarray:
+        # L = check_weak_labels(dataset, n_weaks=n_weaks, random_guess=random_guess)
+        L = dataset[0]
+        # np.random.seed(seed)
+        # np.random.shuffle(L.T)
+        # L = L[:, 0:n_weaks]
+        # n, m = L.shape
+        # r = np.random.randint(0, 2, size=(n, random_guess))
+        # L = np.concatenate((L, r), axis = 1)
         return self.model.predict_proba(L)
