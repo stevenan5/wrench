@@ -11,3 +11,6 @@ from .ebcc import EBCC
 from .ibcc import IBCC
 from .fable import Fable
 from .hyper_label_model import HyperLM
+from .wmrc import WMRC
+from .amcl_cc import AMCL_CC
+
