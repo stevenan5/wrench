@@ -126,7 +126,7 @@ class WMRC(BaseLabelModel):
             y_valid: Optional[np.ndarray] = None,
             n_class: Optional[int] = None,
             constraint_type = 'accuracy',
-            bound_method: Optional[str] = 'std',
+            bound_method: Optional[str] = 'binomial',
             majority_vote: Optional[bool] = False,
             use_inequality_consts: Optional[bool] = True,
             ci_name: Optional[str] = 'wilson',
@@ -250,9 +250,9 @@ class WMRC(BaseLabelModel):
                     # est_class_freqs=True):
         # get the lambda to make the intervals
 
-        if method not in ["std", "binomial", "unsupervised"]:
+        if method not in ["binomial", "unsupervised"]:
             raise ValueError("chosen method must be in"
-                              " ['std', 'binomial', 'unsupervised'].")
+                              " ['binomial', 'unsupervised'].")
 
         L = dataset[0]
 
@@ -336,12 +336,7 @@ class WMRC(BaseLabelModel):
             if class_freq_probs[1, j] == 0:
                 continue
 
-            if method == 'std':
-                # recall y_shrunk is sometimes the unchanged y
-                epsilon = np.std(y)/np.sqrt(np.bincount(y)[j])
-                class_freq_probs[0, j] = class_freq_probs[1, j] - epsilon
-                class_freq_probs[2, j] = class_freq_probs[1, j] + epsilon
-            elif method == 'binomial':
+            if method == 'binomial':
                 class_freq_probs[[0, 2], j] = proportion_confint(
                         n_labeled * class_freq_probs[1, j],
                         n_labeled,
@@ -369,12 +364,6 @@ class WMRC(BaseLabelModel):
 
             conf_mat_y = confusion_matrix(y[pred_on], L[pred_on, j],
                     labels=np.arange(self.n_class), normalize='all')
-            if method == 'std':
-                # this isn't used for unsupervised estimation
-                conf_mat_mv = confusion_matrix(
-                        mv_pred_hard[pred_on],
-                        L[pred_on, j], labels=np.arange(self.n_class),
-                        normalize='all')
             if method == 'unsupervised':
                 # modify the prediction matrix so the uniform distribution
                 # is predicted when the rule abstains
@@ -387,17 +376,7 @@ class WMRC(BaseLabelModel):
                     * np.sum(conf_mat_y, axis=1)
 
             if self.constraint_type == 'accuracy':
-                if method == 'std':
-                    param_probs[1, j] = np.trace(conf_mat_y)
-                    corr_preds = np.sum(
-                            np.multiply(y_aug, L_aug[j]), axis=1)
-                    epsilon = max(np.std(corr_preds), \
-                            abs(param_probs[1, j] - np.trace(conf_mat_mv)))\
-                            /np.sqrt(n_rule_preds[j])
-                    param_probs[0, j] = param_probs[1, j] - epsilon
-                    param_probs[2, j] = param_probs[1, j] + epsilon
-
-                elif method in 'binomial':
+                if method in 'binomial':
                     param_probs[1, j] = np.trace(conf_mat_y)
                     param_probs[[0, 2], j] = proportion_confint(
                             n_rule_preds[j] * param_probs[1, j],n_rule_preds[j],
@@ -417,32 +396,7 @@ class WMRC(BaseLabelModel):
                     #         alpha=self.binom_ci_fail_pr, method=self.ci_name)
 
             elif self.constraint_type == 'class_accuracy':
-                if method =='std':
-                    param_probs[1, j, :] = np.diag(conf_mat_y)
-                    corr_preds = np.sum(np.multiply(y_aug[pred_on, :],\
-                            L_aug[j, pred_on, :]), axis=1)
-                    classwise_corr_preds = np.zeros((n_rule_preds[j],\
-                            self.n_class))
-                    for l in range(self.n_class):
-                        classwise_corr_preds[:, l] = \
-                                np.multiply(corr_preds, class_pos[pred_on, l])
-
-                    epsilon = np.maximum(
-                            np.std(classwise_corr_preds, axis=0),\
-                            abs(param_probs[1, j, :]
-                                - np.diag(conf_mat_mv)))\
-                                        / np.sqrt(n_rule_preds[j])
-                    param_probs[0, j, :] = param_probs[1, j, :] - epsilon
-                    param_probs[2, j, :] = param_probs[1, j, :] + epsilon
-
-                    # if the rule didn't predict on a class, then reset the
-                    # bounds because we have no information
-                    sel = preds_per_label == 0
-                    param_probs[0, j, sel] = 0
-                    param_probs[1, j, sel] = 0
-                    param_probs[2, j, sel] = 1
-
-                elif method == 'binomial':
+                if method == 'binomial':
                     param_probs[1, j, :] = np.diag(conf_mat_y)
                     # don't do the confidence interval on classes where
                     # there were no predictions
@@ -458,33 +412,7 @@ class WMRC(BaseLabelModel):
                     raise ValueError("Unsupervised estimation not implemented"
                             " for class conditional accuracy constraints")
             else:
-                if method == 'std':
-                    param_probs[1, j, :, :] = conf_mat_y
-                    # compute the indices where the classifier predicts
-                    # label j when the true label was k
-                    pred_given_class = np.zeros(\
-                            (self.n_class, self.n_class, n_rule_preds[j]))
-                    for l in range(self.n_class):
-                        for k in range(self.n_class):
-                            pred_given_class[l, k, :] = np.multiply(
-                                    L_aug[j, pred_on, l], y_aug[pred_on, k])
-
-                    epsilon = np.maximum(np.std(pred_given_class, axis=2),\
-                            abs(param_probs[1, j, :, :] - conf_mat_mv)) \
-                                    /np.sqrt(n_rule_preds[j])
-                    param_probs[0, j, :, :] = param_probs[1, j, :, :] \
-                                                                - epsilon
-                    param_probs[2, j, :, :] = param_probs[1, j, :, :]\
-                                                                + epsilon
-
-                    # if the rule didn't predict on a class, then reset the
-                    # bounds because we have no information
-                    sel = preds_per_label == 0
-                    param_probs[0, j, sel, :] = 0
-                    param_probs[1, j, sel, :] = 0
-                    param_probs[2, j, sel, :] = 1
-
-                elif method == 'binomial':
+                if method == 'binomial':
                     param_probs[1, j, :, :] = conf_mat_y
                     for l in range(self.n_class):
                         # don't do the confidence interval on classes where
