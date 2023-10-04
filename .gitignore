@@ -127,3 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# dataset setting files
+datasets/*.json
+datasets/synthetic/
+
+# results
+results/
+
+# tags
+*tags
