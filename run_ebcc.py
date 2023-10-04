@@ -32,7 +32,8 @@ def run_ebcc(
         save_path=None,
         n_runs=10,
         num_samples=500,
-        replot=False
+        replot=False,
+        get_confidences=True
         ):
 
     #### Load dataset
@@ -164,7 +165,7 @@ def run_ebcc(
                 logger.info('test brier score: %.4f', brier_score_test)
 
         # compute confidence intervals if it's the first run
-        if run_no == 0 or replot:
+        if (run_no == 0 and get_confidences) or replot:
             logger.info('------Computing Confidence Intervals------')
             if replot:
                 mdic = sio.loadmat(os.path.join(save_path, result_filename))
