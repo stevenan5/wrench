@@ -128,6 +128,5 @@ We have also included some code to visualize the predictions of each method (for
 
 
 ## Miscellaneous Information
-talk about dataset format
-talk about formats of main variables used
-talk about the general control flow
+We store a simplified version of `wrench` datasets as `.mat` files.
+They contain train, validation, and possibly test labels and labeling function predictions.
