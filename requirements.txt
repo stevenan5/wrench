@@ -1,2 +1,8 @@
 mosek==9.3.22
 gurobipy==9.1.2
+matplotlib==3.3.4
+pytokenizations==0.8.4
+numba==0.43.0
+pgmpy==0.1.23
+tensorboardx==1.4
+hyperlm==0.0.5
