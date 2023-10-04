@@ -15,7 +15,6 @@ if __name__ == "__main__":
     # load all the data from the saved files
     results_folder_path = './results'
 
-
     for dataset in datasets:
 
         dataset_result_path = os.path.join(results_folder_path, dataset)
