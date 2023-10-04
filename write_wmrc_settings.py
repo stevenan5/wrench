@@ -215,76 +215,78 @@ if __name__ == '__main__':
             }
 
     synth_prefix = os.path.join(prefix, 'synthetic')
-    n_synth = 10
-    for i in range(n_synth):
-        synth_dic_i = deepcopy(synth_dic)
-        synth_dic_i['dataset_name'] += str(i)
-        synth_dics = [dict(gen_dic, **synth_dic_i) for gen_dic in synth_dics_to_use]
+    if os.path.exists(synth_prefix):
+        n_synth = 10
+        for i in range(n_synth):
+            synth_dic_i = deepcopy(synth_dic)
+            synth_dic_i['dataset_name'] += str(i)
+            synth_dics = [dict(gen_dic, **synth_dic_i) for gen_dic in synth_dics_to_use]
 
-        write_path = os.path.join(synth_prefix, 'synth_10p_1000n_100nval__' +\
-                str(i) + '_configs.json')
-        with open(write_path, 'w') as fout:
-            json.dump(synth_dics, fout)
+            write_path = os.path.join(synth_prefix, 'synth_10p_1000n_100nval__' +\
+                    str(i) + '_configs.json')
+            with open(write_path, 'w') as fout:
+                json.dump(synth_dics, fout)
 
     ### for crowdsourced datasets
-    crowd_dics_to_use = [oracle_kwargs, unsup_kwargs]
-    bird_dic = {
-            'dataset_name': 'bird',
-            'n_classes': 2,
-            'use_test' : False,
-            'pattern_neighborhood_size': 20,
-            'pred_prob_incr' : 20,
-            'n_runs' : 1,
-            # MOSEK doesn't like one of the sets of constraints (UNKNOWN status)
-            # and I'm too lazy to figure out how to reconfigure MOSEK to make
-            # it work
-            'solver' : 'ECOS',
-            }
-    # we want dataset specific entries to overwrite the general entries
-    bird_dics = [dict(gen_dic, **bird_dic) for gen_dic in crowd_dics_to_use]
-    write_path = os.path.join(prefix, 'bird_configs.json')
-    with open(write_path, 'w') as fout:
-        json.dump(bird_dics, fout)
+    if False:
+        crowd_dics_to_use = [oracle_kwargs, unsup_kwargs]
+        bird_dic = {
+                'dataset_name': 'bird',
+                'n_classes': 2,
+                'use_test' : False,
+                'pattern_neighborhood_size': 20,
+                'pred_prob_incr' : 20,
+                'n_runs' : 1,
+                # MOSEK doesn't like one of the sets of constraints (UNKNOWN status)
+                # and I'm too lazy to figure out how to reconfigure MOSEK to make
+                # it work
+                'solver' : 'ECOS',
+                }
+        # we want dataset specific entries to overwrite the general entries
+        bird_dics = [dict(gen_dic, **bird_dic) for gen_dic in crowd_dics_to_use]
+        write_path = os.path.join(prefix, 'bird_configs.json')
+        with open(write_path, 'w') as fout:
+            json.dump(bird_dics, fout)
 
-    rte_dic = {
-            'dataset_name': 'rte',
-            'n_classes': 2,
-            'use_test' : False,
-            'pattern_neighborhood_size': 16,
-            'pred_prob_incr' : 20,
-            'n_runs' : 1,
-            }
-    # we want dataset specific entries to overwrite the general entries
-    rte_dics = [dict(gen_dic, **rte_dic) for gen_dic in crowd_dics_to_use]
-    write_path = os.path.join(prefix, 'rte_configs.json')
-    with open(write_path, 'w') as fout:
-        json.dump(rte_dics, fout)
+        rte_dic = {
+                'dataset_name': 'rte',
+                'n_classes': 2,
+                'use_test' : False,
+                'pattern_neighborhood_size': 16,
+                'pred_prob_incr' : 20,
+                'n_runs' : 1,
+                }
+        # we want dataset specific entries to overwrite the general entries
+        rte_dics = [dict(gen_dic, **rte_dic) for gen_dic in crowd_dics_to_use]
+        write_path = os.path.join(prefix, 'rte_configs.json')
+        with open(write_path, 'w') as fout:
+            json.dump(rte_dics, fout)
 
-    dog_dic = {
-            'dataset_name': 'dog',
-            'n_classes': 4,
-            'use_test' : False,
-            'pattern_neighborhood_size': 18,
-            'pred_prob_incr' : 35,
-            'n_runs' : 1,
-            }
-    # we want dataset specific entries to overwrite the general entries
-    dog_dics = [dict(gen_dic, **dog_dic) for gen_dic in crowd_dics_to_use]
-    write_path = os.path.join(prefix, 'dog_configs.json')
-    with open(write_path, 'w') as fout:
-        json.dump(dog_dics, fout)
+        dog_dic = {
+                'dataset_name': 'dog',
+                'n_classes': 4,
+                'use_test' : False,
+                'pattern_neighborhood_size': 18,
+                'pred_prob_incr' : 35,
+                'n_runs' : 1,
+                }
+        # we want dataset specific entries to overwrite the general entries
+        dog_dics = [dict(gen_dic, **dog_dic) for gen_dic in crowd_dics_to_use]
+        write_path = os.path.join(prefix, 'dog_configs.json')
+        with open(write_path, 'w') as fout:
+            json.dump(dog_dics, fout)
 
-    web_dic = {
-            'dataset_name': 'web',
-            'n_classes': 5,
-            'use_test' : False,
-            # if you bring the below down to 9 you get an huge number of groups
-            'pattern_neighborhood_size': 10,
-            'pred_prob_incr' : 35,
-            'n_runs' : 1,
-            }
-    # we want dataset specific entries to overwrite the general entries
-    web_dics = [dict(gen_dic, **web_dic) for gen_dic in crowd_dics_to_use]
-    write_path = os.path.join(prefix, 'web_configs.json')
-    with open(write_path, 'w') as fout:
-        json.dump(web_dics, fout)
+        web_dic = {
+                'dataset_name': 'web',
+                'n_classes': 5,
+                'use_test' : False,
+                # if you bring the below down to 9 you get an huge number of groups
+                'pattern_neighborhood_size': 10,
+                'pred_prob_incr' : 35,
+                'n_runs' : 1,
+                }
+        # we want dataset specific entries to overwrite the general entries
+        web_dics = [dict(gen_dic, **web_dic) for gen_dic in crowd_dics_to_use]
+        write_path = os.path.join(prefix, 'web_configs.json')
+        with open(write_path, 'w') as fout:
+            json.dump(web_dics, fout)
