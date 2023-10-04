@@ -1,19 +1,13 @@
 import os
-import json
 import logging
 
 import numpy as np
-from numpy.matlib import repmat
 from scipy.io import savemat
 import scipy.io as sio
-import matplotlib.pyplot as plt
 
-from wrench.dataset import load_image_dataset
-from wrench.dataset import load_dataset
 from wrench._logging import LoggingHandler
 from wrench.labelmodel import MajorityVoting
 from sklearn.calibration import calibration_curve
-from sklearn.metrics import brier_score_loss
 from sklearn.metrics import log_loss
 
 #### Just some code to print debug information to stdout
@@ -165,9 +159,8 @@ if __name__ == '__main__':
     # wrench datasets
     datasets = ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
             'imdb', 'obs', 'sms', 'yelp', 'youtube']
-    # datasets = ['imdb']
     # crowdsourcing datasets
-    datasets += ['bird', 'rte', 'dog', 'web']
+    # datasets += ['bird', 'rte', 'dog', 'web']
 
     for dataset in datasets:
         # make result folder if it doesn't exist

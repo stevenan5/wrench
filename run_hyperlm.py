@@ -217,9 +217,8 @@ if __name__ == '__main__':
     # wrench datasets
     datasets = ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
             'imdb', 'obs', 'sms', 'yelp', 'youtube']
-    # datasets = ['imdb']
     # crowdsourcing datasets
-    datasets += ['bird', 'rte', 'dog', 'web']
+    # datasets += ['bird', 'rte', 'dog', 'web']
 
     for dataset in datasets:
         # make result folder if it doesn't exist

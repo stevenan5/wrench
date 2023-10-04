@@ -946,10 +946,10 @@ if __name__ == '__main__':
     # path for config jsons
     dataset_prefix = './datasets/'
 
-    # use_synthetic = False
-    use_synthetic = True
-    replot_figs = True
-    # replot_figs = False
+    use_synthetic = False
+    # use_synthetic = True
+    # replot_figs = True
+    replot_figs = False
 
     datasets = []
     if use_synthetic:
@@ -965,7 +965,7 @@ if __name__ == '__main__':
         datasets += ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
                'imdb', 'obs', 'sms', 'yelp', 'youtube']
         # crowdsourcing datasets
-        datasets += ['bird', 'rte', 'dog', 'web']
+        # datasets += ['bird', 'rte', 'dog', 'web']
 
     # constraint_types = ['accuracy', 'class_accuracy', 'confusion_matrix']
     constraint_types = ['accuracy']
@@ -1010,7 +1010,7 @@ if __name__ == '__main__':
                         # remove old handlers
                         for handler in logger.handlers[:]:
                             logger.removeHandler(handler)
-                        formatter = logging.Formatter('%(asctime)s - %(message)s',
+                        formatter=logging.Formatter('%(asctime)s - %(message)s',
                                 '%Y-%m-%d %H:%M:%S')
                         log_filename = get_result_filename(
                                 dataset,
@@ -1027,7 +1027,7 @@ if __name__ == '__main__':
                         logger.addHandler(file_handler)
                         # log all the run parameters
                         logger.info('----------Running New Instance----------')
-                        logger.info('dataset: %s, n_class: %d', dataset, n_class)
+                        logger.info('dataset: %s, n_class: %d', dataset,n_class)
                         logger.info('constraint type: %s, add MV const: %s',
                                 constraint_type, cfg['add_mv_const'])
                         logger.info('labeled set: %s, use inequalities: %s',

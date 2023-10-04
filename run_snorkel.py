@@ -230,8 +230,7 @@ if __name__ == '__main__':
     datasets += ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
             'imdb', 'obs', 'sms', 'yelp', 'youtube']
     # crowdsourcing datasets
-    datasets += ['bird', 'rte', 'dog', 'web']
-    datasets =['aa2']
+    # datasets += ['bird', 'rte', 'dog', 'web']
 
     for dataset in datasets:
         # make result folder if it doesn't exist
