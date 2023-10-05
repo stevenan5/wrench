@@ -186,6 +186,7 @@ def run_wmrc(
             mdic["wmrc_xent_ub"].append(-1 * label_model.prob.value\
                     / n_train_points)
             if n_classes == 2:
+                # this is kind of screwy in terms of the resulting format
                 mdic["x_calibration_train"].append(prob_pred_train)
                 mdic["y_calibration_train"].append(prob_true_train)
 
@@ -308,7 +309,7 @@ def run_wmrc(
                 mdic_conf_pattern_neigh = compute_plot_save_confidences(
                         file_name_pn_full, dataset_name, constraint_form,
                         label_model, 'pattern_neigh', train_data, logger,
-                        n_classes, is_oracle, mdic, oracle_mdic, objective=conf_obj,
+                        n_classes,is_oracle,mdic,oracle_mdic,objective=conf_obj,
                         pattern_neigh_size=pattern_neighborhood_size,
                         eta_train=eta_train,
                         combine_intervals=combine_intervals, replot=replot
@@ -328,8 +329,9 @@ def run_wmrc(
                 mdic_conf_pred_prob = compute_plot_save_confidences(
                         file_name_pp_full, dataset_name, constraint_form,
                         label_model, 'pred_prob', train_data, logger,
-                        n_classes, is_oracle, mdic, oracle_mdic, objective=conf_obj,
-                        eta_train=eta_train, thresholds=thresholds,
+                        n_classes, is_oracle, mdic, oracle_mdic,
+                        objective=conf_obj, eta_train=eta_train,
+                        thresholds=thresholds,
                         combine_intervals=combine_intervals, replot=replot
                         )
 
@@ -345,13 +347,15 @@ def run_wmrc(
                 file_name_pp_lb = file_name_cis + '_' + conf_obj \
                          + '_pred_prob_lb_only' + '_incr' + str(incr)\
                          + '.eps'
-                file_name_pp_lb_full = os.path.join(save_path_conf, file_name_pp_lb)
+                file_name_pp_lb_full = os.path.join(save_path_conf,
+                        file_name_pp_lb)
 
                 mdic_conf_pred_prob_lb = compute_plot_save_confidences(
                         file_name_pp_lb_full, dataset_name, constraint_form,
                         label_model, 'pred_prob_lb', train_data, logger,
-                        n_classes, is_oracle, mdic, oracle_mdic, objective=conf_obj,
-                        eta_train=eta_train, thresholds=thresholds_lb_only,
+                        n_classes, is_oracle, mdic, oracle_mdic,
+                        objective=conf_obj, eta_train=eta_train,
+                        thresholds=thresholds_lb_only,
                         combine_intervals=False, replot=replot
                         )
 
@@ -359,21 +363,23 @@ def run_wmrc(
 
                 ### prediction percentiles lower bound only, combined classes
                 incr_comb_class = 5
-                thresholds_lb_only_comb_class = np.arange(100 - incr_comb_class,\
+                thresholds_lb_only_comb_class=np.arange(100 - incr_comb_class,\
                         100/n_classes - incr_comb_class, - incr_comb_class)
                 # just in case n_classes is 3 or something
                 thresholds_lb_only_comb_class[-1] = int(100/n_classes)
 
                 file_name_pp_lb_cc = file_name_cis + '_' + conf_obj \
-                         + '_pred_prob_lb_only_comb_class' + '_incr' + str(incr_comb_class)\
-                         + '.eps'
-                file_name_pp_lb_cc_full = os.path.join(save_path_conf, file_name_pp_lb_cc)
+                         + '_pred_prob_lb_only_comb_class' + '_incr'\
+                         + str(incr_comb_class) + '.eps'
+                file_name_pp_lb_cc_full = os.path.join(save_path_conf,
+                        file_name_pp_lb_cc)
 
                 mdic_conf_pred_prob_lb_cc = compute_plot_save_confidences(
                         file_name_pp_lb_cc_full, dataset_name, constraint_form,
-                        label_model, 'pred_prob_lb_comb_class', train_data, logger,
-                        n_classes, is_oracle, mdic, oracle_mdic, objective=conf_obj,
-                        eta_train=eta_train, thresholds=thresholds_lb_only_comb_class,
+                        label_model, 'pred_prob_lb_comb_class', train_data,
+                        logger, n_classes, is_oracle, mdic, oracle_mdic,
+                        objective=conf_obj, eta_train=eta_train,
+                        thresholds=thresholds_lb_only_comb_class,
                         combine_intervals=False, replot=replot, skip_plot=True
                         )
 
@@ -387,15 +393,15 @@ def run_wmrc(
                     mdic_conf_pattern = compute_plot_save_confidences(
                             file_name_p_full, dataset_name, constraint_form,
                             label_model, 'pattern', train_data, logger,
-                            n_classes, is_oracle, mdic, oracle_mdic, objective=conf_obj,
-                            pattern_neigh_size=pattern_neighborhood_size,
-                            eta_train=eta_train,
+                            n_classes, is_oracle, mdic, oracle_mdic,
+                            objective=conf_obj, eta_train=eta_train,
                             combine_intervals=combine_intervals, replot=replot
                             )
 
                     mdic.update(mdic_conf_pattern)
                 else:
-                    logger.info('too many patterns, skipping pattern confidence ints')
+                    logger.info('too many patterns, skipping pattern '
+                                'confidence ints')
 
     # if number of runs is >1, report and store mean results and standard
     # deviations
@@ -946,10 +952,13 @@ if __name__ == '__main__':
     # path for config jsons
     dataset_prefix = './datasets/'
 
+    # whether or not wmrc should be run on synthetic datasets
     use_synthetic = False
     # use_synthetic = True
-    # replot_figs = True
+
+    # whether or not figures are to be replot from saved data
     replot_figs = False
+    # replot_figs = True
 
     datasets = []
     if use_synthetic:

@@ -29,7 +29,6 @@ class WMRC(BaseLabelModel):
                  verbose: Optional[bool] = False,
                  **kwargs: Any):
         super().__init__()
-        # self.hyperparas = {}
         self.solver = solver
         self.conf_solver = conf_solver
         self.verbose = verbose
@@ -248,7 +247,8 @@ class WMRC(BaseLabelModel):
 
     def _get_prob_bounds(self, dataset, method='binomial', bound_scale=1):
                     # est_class_freqs=True):
-        # get the lambda to make the intervals
+        # get the epsilons, or the intervals which the estimate accuracy of
+        # each classifier/labeling frequency falls in
 
         if method not in ["binomial", "unsupervised"]:
             raise ValueError("chosen method must be in"
@@ -458,24 +458,9 @@ class WMRC(BaseLabelModel):
 
         return param_cts, class_freq_cts
 
-    # experimental, still need to read off dual values to return weights
-    def _make_primal_cp(self, L_aug, param_cts, use_error_bars=True):
-        # create variables
-        z = cp.Variable((L_aug.shape[1], self.n_class))
-        if not use_error_bars:
-            self.param_cts[0] = self.param_cts[1]
-            self.param_cts[2] = self.param_cts[1]
-            self.class_freq_cts[0] = self.class_freq_cts[1]
-            self.class_freq_cts[2] = self.class_freq_cts[1]
-
-        constrs = self._get_primal_constraints(L_aug, z)
-        obj = cp.Maximize(cp.sum(cp.entr(z)))
-        prob = cp.Problem(obj, constrs)
-
-        return prob, None, None
-
     def _make_dual_cp(self, L_aug, param_cts, class_freq_cts,
             use_error_bars=True):
+        # make the dual convex program, which is solved in fit
         # create variables
         if self.constraint_type == 'accuracy':
             sigma = cp.Variable(self.p)
@@ -548,14 +533,21 @@ class WMRC(BaseLabelModel):
         return cp.Problem(obj, constrs), sigma, gamma
 
     def _initialize_L_aug(self, L):
+        # convert L into a stack of matrices, one-hot encodings of each
+        # classifier's predictions. index 0 is which classifier, index 1 is
+        # the datapoint index, index 2 is the class index
         L = L.T
         L_aug = (np.arange(self.n_class) == L[..., None]).astype(int)
         return L_aug
 
     def _initialize_one_hot_labels(self, y):
+        # used to convert ground truth labels into one hot encoded labels.
+        # rows are datapoints, columns are classes
         return np.squeeze(self._initialize_L_aug(y))
 
     def _aggregate_weights(self, L_aug, param_wts, class_freq_wts, mod=cp):
+        # essentially create the weighted majority vote with provided weights
+
         # assuming param_wts is a k by k matrix where element ij is the weight
         # associated with the classifier predicting j when true label is i.
         p, n, _ = L_aug.shape
@@ -576,7 +568,7 @@ class WMRC(BaseLabelModel):
                 y_pred += L_aug[j] @ param_wts[j].T
         return y_pred
 
-    def _make_bf_preds(self, L_aug, param_wts, class_freq_wts):
+    def _make_wmrc_preds(self, L_aug, param_wts, class_freq_wts):
         y_pred = self._aggregate_weights(L_aug, param_wts, class_freq_wts, mod=np)
         return sp.special.softmax(y_pred, axis=1)
 
@@ -596,10 +588,11 @@ class WMRC(BaseLabelModel):
         L = dataset_mod[0]
 
         L_aug = self._initialize_L_aug(L)
-        y_pred = self._make_bf_preds(L_aug, self.param_wts, self.class_freq_wts)
+        y_pred = self._make_wmrc_preds(L_aug, self.param_wts, self.class_freq_wts)
         return y_pred
 
     def _get_primal_constraints(self, L, z):
+        # for confidences, we are solving the primal problem
 
         L_aug = self._initialize_L_aug(L)
         if self.majority_vote:
@@ -648,6 +641,8 @@ class WMRC(BaseLabelModel):
         return constrs
 
     def _make_confidence_progs(self, z, constrs, n_points, wmrc_preds=None):
+        # make the linear programs used to compute the confidences
+        # the constraints stay the same, and only the objective changes
 
         self.sel = cp.Parameter(n_points * self.n_class)
 
@@ -667,6 +662,9 @@ class WMRC(BaseLabelModel):
         self.ub_prob = cp.Problem(ub_obj, constrs)
 
     def _pattern_selections(self, L):
+        # partition the predictions L via patterns. a pattern is essentially
+        # the string of predictions of all classifiers on a datapoint.
+
         # want each prediction to be in a row
         n_pts = L.shape[0]
         L = L.T
@@ -724,6 +722,12 @@ class WMRC(BaseLabelModel):
 
     def _predicted_prob_selections(self, preds, L, prediction_thresholds,
             use_ub=True, combine_classes=False):
+        # group the datapoints based on the predicted probabilities of WMRC
+        # have the option of using both upper and lower bounds on predicted
+        # probabilities, and whether or not one wants to group datapoints by
+        # predicted probability of a certain class falling inside the interval
+        # of probabilities.  e.g. if combine_classes=True, then points will be
+        # grouped if at least one class has probability >= 0.9 (or another prob)
 
         self._pattern_selections(L)
         n_pts = preds.shape[0]
@@ -929,6 +933,7 @@ class WMRC(BaseLabelModel):
         return ci, mean_pred, gt_mean_pred
 
     def _mean_group_preds(self, selections, preds):
+        # average the predictions on datapoints grouped together by selections
         m = selections.shape[0]
         # cast to bool so we can mask
         selections = selections.astype(bool)
