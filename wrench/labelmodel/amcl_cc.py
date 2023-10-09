@@ -11,25 +11,6 @@ from wrench.dataset import BaseDataset
 
 
 class AMCL_CC(BaseLabelModel):
-    """AMCL Convex Combination (AMCL_CC)
-
-    Usage:
-
-        ebcc = EBCC(num_groups, a_pi, a_v, b_v, repeat, inference_iter, empirical_prior)
-        ebcc.fit(train_data)
-        ebcc.test(test_data)
-
-    Parameters:
-
-        num_groups: number of subtypes
-        a_pi: The parameter of dirichlet distribution to generate mixture weight.
-        a_v: b_kk, number of corrected labeled items under every class.
-        b_v: b_kk', all kind of miss has made b_kk' times.
-        repeat: ELBO update times.
-        inference_iter: Iterations of variational inference.
-        empirical_prior: The empirical prior of alpha.
-        seed: Random seed.
-    """
     def __init__(self,
                  logger,
                  seed: Optional[int] = None,
