@@ -32,7 +32,6 @@ class AMCL_CC(BaseLabelModel):
             verbose: Optional[bool] = False,
             eps = 0.3,
             T = 500,
-            n_tries = 5,
             *args: Any,
             **kwargs: Any):
 
@@ -94,9 +93,6 @@ class AMCL_CC(BaseLabelModel):
         pred = self.predict_proba(dataset_train)
 
         return pred
-
-        raise ValueError(f"Cannot generate feasible region after {n_tries} attempts")
-
 
     def predict_proba(self,
                       dataset: Union[BaseDataset, np.ndarray],
