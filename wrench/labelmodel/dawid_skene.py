@@ -3,7 +3,7 @@ import warnings
 from typing import Any, Optional, Union
 
 import numpy as np
-from numba import njit, prange
+#from numba import njit, prange
 from tqdm.auto import trange
 
 from ..basemodel import BaseLabelModel
@@ -15,18 +15,20 @@ logger = logging.getLogger(__name__)
 ABSTAIN = -1
 
 
-@njit(parallel=True, nogil=True)
+#@njit(parallel=True, nogil=True)
 def help_e_step(Y_p, error_rates, L_aug):
     n, n_class = Y_p.shape
     for i in prange(n):
         for j in range(n_class):
-            Y_p[i, j] *= np.prod(np.power(error_rates[:, j, :], L_aug[i, :, :]))
+            #Y_p[i, j] *= np.prod(np.power(error_rates[:, j, :], L_aug[i, :, :]))
+            Y_p[i, j] += np.sum(np.log(error_rates[:, j, :]) * L_aug[i, :, :])
 
 
-@njit(parallel=True, nogil=True)
+#@njit(parallel=True, nogil=True)
 def initialize_Y_p(Y_p, L, n_class):
     n, m = L.shape
-    for i in prange(n):
+    #for i in prange(n):
+    for i in range(n):
         counts = np.zeros(n_class)
         for j in range(m):
             if L[i, j] != ABSTAIN:
@@ -57,18 +59,20 @@ class DawidSkene(BaseLabelModel):
             **kwargs: Any):
 
         self._update_hyperparas(**kwargs)
-        if isinstance(dataset_train, BaseDataset):
-            if n_class is not None:
-                assert n_class == dataset_train.n_class
-            else:
-                n_class = dataset_train.n_class
+        #if isinstance(dataset_train, BaseDataset):
+        #    if n_class is not None:
+        #        assert n_class == dataset_train.n_class
+        #    else:
+        #        n_class = dataset_train.n_class
 
-        L = check_weak_labels(dataset_train)
-        n_class = n_class or L.max() + 1
+        # L = check_weak_labels(dataset_train)
+        # n_class = n_class or L.max() + 1
+        L = dataset_train[0]
         self.n_class = n_class
 
         Y_p = self._initialize_Y_p(L)
         L_aug = self._initialize_L_aug(L)
+
 
         max_iter = self.hyperparas['n_epochs']
         tol = self.hyperparas['tolerance']
@@ -139,6 +143,10 @@ class DawidSkene(BaseLabelModel):
         help_e_step(Y_p, error_rates, L_aug)
 
         # normalize error rates by dividing by the sum over all observation classes
+        
+        # use softmax
+        row_maxs = np.amax(s, axis=1)
+        Y_p = np.exp(Y_p - row_maxs)
         s = np.sum(Y_p, axis=-1, keepdims=True)
         Y_p = np.divide(Y_p, s, where=s != 0)
         return Y_p
