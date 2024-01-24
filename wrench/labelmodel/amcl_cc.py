@@ -23,6 +23,7 @@ class AMCL_CC(BaseLabelModel):
         # meant to be parameter for LP
         self.cost_matrix = None
         self.logger = logger
+        self.verbose = False
 
     def fit(self,
             dataset_train: Union[BaseDataset, np.ndarray],
@@ -32,9 +33,10 @@ class AMCL_CC(BaseLabelModel):
             verbose: Optional[bool] = False,
             eps = 0.3,
             T = 500,
-            n_tries = 5,
             *args: Any,
             **kwargs: Any):
+
+        self.verbose = verbose
 
         L_train = dataset_train[0]
         y_train = dataset_train[1]
@@ -68,20 +70,21 @@ class AMCL_CC(BaseLabelModel):
         # eps and T have defaults in fit function
         L = 2 * np.sqrt(num_label_fns + 1)
         squared_diam = 2
+        # We are taking user provided value rather than computing it ourself.
         # T = int(np.ceil(L*L*squared_diam/(eps*eps)))
         h = eps/(L*L)
 
-        Y, constraints, used_lfs = self.compute_constraints_with_loss2(
-                self.brier_loss_linear_vectorized, self.brier_score_amcl_vectorized,
+        Y, constraints = self.compute_constraints_with_loss2(
+                self.brier_loss_linear_vectorized,
+                self.brier_score_amcl_vectorized,
                 L_train_aug, L_valid_aug, y_valid_aug, y_train_aug)
 
         # initial weights
-        # used_lfs will give a 0 in all positions where the LF is not used
-        # and equally distribute the mass to all other LFs.
-        init_theta = used_lfs * np.mean(used_lfs)
+        init_theta = np.ones(num_label_fns) / num_label_fns
 
         model_theta = self.sub_gradient_method2(L_train_aug, Y, constraints,
-                self.brier_loss_linear_vectorized, self.linear_combination_labeler_vectorized,
+                self.brier_loss_linear_vectorized,
+                self.linear_combination_labeler_vectorized,
                 self.project_to_simplex, init_theta, T, h, num_label_fns,
                 num_items, num_classes)
 
@@ -94,9 +97,6 @@ class AMCL_CC(BaseLabelModel):
         pred = self.predict_proba(dataset_train)
 
         return pred
-
-        raise ValueError(f"Cannot generate feasible region after {n_tries} attempts")
-
 
     def predict_proba(self,
                       dataset: Union[BaseDataset, np.ndarray],
@@ -238,12 +238,14 @@ class AMCL_CC(BaseLabelModel):
         X = np.array(X)
         Y = np.array(Y)
         pred = h(theta, X)
-        grad = np.array([2*np.dot(X[:,j],(pred[j]-Y[j])) for j in range(len(Y))])
+        grad=np.array([2*np.dot(X[:,j],(pred[j]-Y[j])) for j in range(len(Y))])
         grad = np.average(grad,axis=0)
         return grad
 
     # https://github.com/BatsResearch/amcl/blob/main/algorithms/subgradient_method.py#L273
-    def compute_constraints_with_loss2(self, lf1, lf2, output_labelers_unlabeled, output_labelers_labeled, true_labels, train_labels, lr=False):
+    def compute_constraints_with_loss2(self, lf1, lf2,
+            output_labelers_unlabeled, output_labelers_labeled, true_labels,
+            train_labels=None):
         '''
         Generating constraints for CVXPY implementation
 
@@ -260,15 +262,17 @@ class AMCL_CC(BaseLabelModel):
         C = len(output_labelers_unlabeled[0][0]) # Number of classes
         Ml = len(output_labelers_labeled[0]) # Number of labeled data points
 
-        self.logger.info("Num WL: %d, Num Unlab %d, Num Classes %d, Num Lab %d" % (N,M,C,Ml))
+        self.logger.info("Num WL: %d, Num Unlab %d, Num Classes %d, Num Lab %d"\
+                % (N,M,C,Ml))
 
         # Bounds: risk of a labeler must be within error+-offset
-        delta = 0.1 # Between 0 and 1. Probability of the true labeling to NOT belong to the feasible set.
+        delta = 0.1 # Between 0 and 1. Probability of the true labeling
+                    # to NOT belong to the feasible set.
         B = 1  # Size of the range of the loss function
-        scaling_factor = 0.4 # Direct computation of the offset could yield large values if M or Ml is small.
-                             # This number can be used to scale the offset if it is too large
-        # offset computation has been moved into loop below to accomodate
-        # absentions on labeled data
+        scaling_factor = 0.4 # Direct computation of the offset could yield
+                             # large values if M or Ml is small.
+                             # This number can be used to scale the offset if it
+                             # is too large
 
         if Ml != len(true_labels):
             raise NameError('Labeled data points and label sizes are different')
@@ -279,66 +283,55 @@ class AMCL_CC(BaseLabelModel):
         # Constraint vector
         constraints = []
 
-        # Add constraints for the sum of the label probabilities for each item to sum to 1
+        # Add constraints for the sum of the label probabilities for each
+        # item to sum to 1
         constraints.append(cp.sum(Y, axis=1) == 1)
 
-        used_constraints = np.ones(N)
         # Build constraint for weak classifier
         for i in range(N):
-            # Compute the expected error over the labeled data for each weak classifier
+            # Compute the expected error over the labeled data for each weak
+            # classifier
 
-            # compute number of labeled and unlabeled predictions
-            n_lab_preds_i = np.sum(output_labelers_labeled[i])
-            n_unlab_preds_i = np.sum(output_labelers_unlabeled[i])
-
-            # Compute the coefficient of the linear constraint based on the brier score error
-            # make this here becuase we'll just set it to all 0's if there are
-            # no labeled points to estimate the bounds
+            # Compute the coefficient of the linear constraint based on the
+            # brier score error
             build_coefficients = np.zeros((M,C))
 
-            pred_on_labeled = np.sum(output_labelers_labeled[i], axis=1).astype(bool)
-            if np.sum(pred_on_labeled) == 0:
-                # since we have no labeled data, we won't use the labeling
-                # function at all.  I.e. we will have a trivial constraint 0=0
-                cons_lb = 0
-                cons_ub = 0
-                offset = 0
-                used_constraints[i] = 0
-            else:
-                error = np.mean(lf1(true_labels[pred_on_labeled, :],\
-                        output_labelers_labeled[i][pred_on_labeled, :]))
+            error = np.mean(lf1(true_labels, output_labelers_labeled[i]))
 
-                offset = B * scaling_factor * np.sqrt(
-                        (n_lab_preds_i + n_unlab_preds_i)\
-                                * np.log(4 * N / delta)\
-                                / (2 * (n_lab_preds_i * n_unlab_preds_i)))
-                # offset = 0 # Uncomment this line
-                        # if you do not want to have a offset. This could be better in practice if
-                        #  the number of labeled data and labeled data is very large
+            offset = B * scaling_factor * np.sqrt(
+                    (Ml + M) * np.log(4 * N / delta) / (2 * (Ml * M)))
+            # offset = 0 # Uncomment this line
+                    # if you do not want to have a offset. This could be better
+                    # in practice if
+                    # the number of labeled data and labeled data is very large
 
-                pred_on_unlabeled = np.sum(output_labelers_unlabeled[i], axis=1).astype(bool)
-                error2 = np.mean(lf1(train_labels[pred_on_unlabeled, :], output_labelers_unlabeled[i][pred_on_unlabeled, :]))
-                valid_i_constraint = (error + offset )>= error2 and (error-offset)<= error2
-                # print(valid_i_constraint)
+            # this is to check if the constraints made are valid
+            # pred_on_unlabeled = np.sum(\
+            #         output_labelers_unlabeled[i], axis=1).astype(bool)
+            # error2 = np.mean(lf1(train_labels[pred_on_unlabeled, :], \
+            #         output_labelers_unlabeled[i][pred_on_unlabeled, :]))
+            # valid_i_constraint = (error + offset )>= error2\
+            #         and (error-offset)<= error2
+            # print(valid_i_constraint)
 
-                cons_lb = error - offset
-                cons_ub = error + offset
+            cons_lb = error - offset
+            cons_ub = error + offset
 
-                build_coefficients = lf2(output_labelers_unlabeled[i])/n_unlab_preds_i
-                # set rows to all 0's if abstained on
-                not_pred_on_unlabeled = (1 - np.sum(output_labelers_unlabeled[i], axis=1)).astype(bool)
-                build_coefficients[not_pred_on_unlabeled, :] = 0
+            build_coefficients = lf2(output_labelers_unlabeled[i])/M
 
             # make matrix sparse
             build_coefficients = csr_matrix(build_coefficients)
 
             if(offset != 0):
-                constraints.append( cp.sum(cp.multiply(Y,build_coefficients ) ) <= cons_ub)
-                constraints.append( cp.sum(cp.multiply(Y,build_coefficients ) ) >= cons_lb)
+                constraints.append(cp.sum(cp.multiply(Y,build_coefficients))\
+                        <= cons_ub)
+                constraints.append(cp.sum(cp.multiply(Y,build_coefficients))\
+                        >= cons_lb)
             else:
-                constraints.append( cp.sum(cp.multiply(Y,build_coefficients ) ) == cons_lb)
+                constraints.append(cp.sum(cp.multiply(Y,build_coefficients))\
+                        == cons_lb)
 
-        return Y, constraints, used_constraints
+        return Y, constraints
 
     # https://github.com/BatsResearch/amcl/blob/main/algorithms/subgradient_method.py#L341
     def solve_lp_given_cost2(self, Y, constraints, cost, prob=None):
@@ -349,14 +342,14 @@ class AMCL_CC(BaseLabelModel):
 
         self.cost_matrix.value = cost
         # prob.solve(solver=cp.ECOS, eps=1e-8)
-        # prob.solve(solver=cp.ECOS)
-        prob.solve(solver=cp.GUROBI)
+        prob.solve(solver=cp.GUROBI, verbose=self.verbose)
         # prob.solve(solver=cp.GUROBI, verbose=True, DualReductions=0)
 
         return np.reshape(Y.value, -1), prob.value, prob
 
     # https://github.com/BatsResearch/amcl/blob/main/algorithms/subgradient_method.py#L350
-    def sub_gradient_method2(self, X_unlabeled, Y, constraints, lf, h, proj_function, initial_theta, iteration, step_size, N, M, C, lr=False):
+    def sub_gradient_method2(self, X_unlabeled, Y, constraints, lf, h,
+            proj_function, initial_theta, iteration, step_size, N, M, C):
         '''
         Running the subgradient method (via LP with cvxpy)
 
@@ -383,13 +376,6 @@ class AMCL_CC(BaseLabelModel):
 
             return cum
 
-        # Evaluation for multinomial logistic regression
-        def eval_lr(th):
-            cum = 0
-            for j in range(M):
-                cum += lf(new_y[j], h(th,X_unlabeled[j]))
-            return cum/M
-
         # Current value of the minimax
         best_val = 10e10 # Initialized to a very high value
         theta = initial_theta # Weights of the model
@@ -414,7 +400,8 @@ class AMCL_CC(BaseLabelModel):
         # Subgradient method core implementation
         for t in range(iteration):
 
-            # Compute subgradient with respect to theta and the current labeling of the unlabeled data
+            # Compute subgradient with respect to theta and the current labeling
+            # of the unlabeled data
             grad = self.compute_gradient_comb(theta, X_unlabeled, new_y, h)
 
             # Gradient descent step
@@ -430,7 +417,8 @@ class AMCL_CC(BaseLabelModel):
 
             # Find labeling that maximizes the error
             cost = cost.reshape((M, C))
-            new_y_vec, obj, _ = self.solve_lp_given_cost2(Y, constraints, cost, prob=lp)
+            new_y_vec, obj, _ = self.solve_lp_given_cost2(Y, constraints, cost,\
+                    prob=lp)
             new_y = new_y_vec.reshape((M, C))
 
             # Evaluate the current model with respect to the worst-case error

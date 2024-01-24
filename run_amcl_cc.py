@@ -37,7 +37,13 @@ def run_amcl_cc(
     train_data = [data['train_pred'], data['train_labels']]
     valid_data = [data['val_pred'], data['validation_labels']]
     num_class = np.max(data['train_labels']) + 1
-    result_filename = get_result_filename(dataset)
+
+    # dropped the '_filled' part now that we have loaded the dataset
+    # the dataset_name will only be used now for storing the result
+    if dataset_name[-6:] == 'filled':
+        dataset_name = dataset_name[:-7]
+
+    result_filename = get_result_filename(dataset_name)
 
     if use_test:
         test_data = [data['test_pred'], data['test_labels']]
@@ -232,10 +238,16 @@ if __name__ == '__main__':
     dataset_prefix = './datasets/'
 
     # wrench datasets
-    datasets = ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
-            'imdb', 'obs', 'sms', 'yelp', 'youtube']
+    datasets = ['aa2', 'basketball_filled', 'breast_cancer', 'cardio', 'domain',\
+            'imdb_filled', 'obs', 'sms_filled', 'yelp_filled', 'youtube_filled']
 
     for dataset in datasets:
+
+        # figure out of dataset is 'filled'
+        dataset_orig = dataset
+        if dataset[-6:] == 'filled':
+            dataset = dataset[:-7]
+
         # make result folder if it doesn't exist
         dataset_result_path = os.path.join(results_folder_path, dataset)
         if not os.path.exists(dataset_result_path):
@@ -265,6 +277,6 @@ if __name__ == '__main__':
         run_amcl_cc(
                 dataset_prefix,
                 logger,
-                dataset_name = dataset,
+                dataset_name = dataset_orig,
                 save_path=method_result_path,
                 )
