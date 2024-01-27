@@ -20,7 +20,8 @@ if __name__ == '__main__':
             'bound_method' : 'binomial',
             'use_inequality_consts' : True,
             'add_mv_const': False,
-            'get_confidences' : True,
+            # 'get_confidences' : True,
+            'get_confidences' : False,
             'n_max_labeled' : [100, 150, 200, 250, 300],
             }
 
@@ -38,7 +39,8 @@ if __name__ == '__main__':
             # doesn't matter what this is because we're not using any intervals
             'bound_method' : 'binomial',
             'use_inequality_consts' : False,
-            'get_confidences' : True,
+            # 'get_confidences' : True,
+            'get_confidences' : False,
             'add_mv_const': False,
             # using empirical training accuracies is just for the transductive
             # setting and not meant for the inductive one
@@ -46,7 +48,8 @@ if __name__ == '__main__':
             'n_max_labeled' : [-1],
             }
     # list out which general dictionaries to use
-    dics_to_use = [oracle_kwargs, semisup_kwargs, semisup_mv_kwargs, unsup_kwargs]
+    # dics_to_use = [oracle_kwargs, semisup_kwargs, semisup_mv_kwargs, unsup_kwargs]
+    dics_to_use = [oracle_kwargs, semisup_kwargs]
 
     ### wrench datasets
     aa2_dic = {
@@ -63,8 +66,9 @@ if __name__ == '__main__':
     # we want dataset specific entries to overwrite the general entries
     aa2_dics = [dict(gen_dic, **aa2_dic) for gen_dic in dics_to_use]
     # add custom n_max_labeled for this dataset only
-    for i in [1, 2]:
-        aa2_dics[i]['n_max_labeled'] = [100, 113, 125, 137, 150, 161, 172]
+    # for i in [1, 2]:
+    #     aa2_dics[i]['n_max_labeled'] = [100, 113, 125, 137, 150, 161, 172]
+    aa2_dics[1]['n_max_labeled'] = [100, 113, 125, 137, 150, 161, 172]
     write_path = os.path.join(prefix, 'aa2_configs.json')
     with open(write_path, 'w') as fout:
         json.dump(aa2_dics, fout)
