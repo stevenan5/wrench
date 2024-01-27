@@ -336,7 +336,9 @@ class WMRC(BaseLabelModel):
             if class_freq_probs[1, j] == 0:
                 continue
 
-            if method == 'binomial':
+            if not self.use_inequality_consts:
+                class_freq_probs[[0, 2], j] = class_freq_probs[1, j]
+            elif method == 'binomial':
                 class_freq_probs[[0, 2], j] = proportion_confint(
                         n_labeled * class_freq_probs[1, j],
                         n_labeled,
@@ -376,7 +378,10 @@ class WMRC(BaseLabelModel):
                     * np.sum(conf_mat_y, axis=1)
 
             if self.constraint_type == 'accuracy':
-                if method in 'binomial':
+                if not self.use_inequality_consts:
+                    param_probs[1, j] = np.trace(conf_mat_y)
+                    param_probs[[0, 2], j] = param_probs[1, j]
+                elif method in 'binomial':
                     param_probs[1, j] = np.trace(conf_mat_y)
                     param_probs[[0, 2], j] = proportion_confint(
                             n_rule_preds[j] * param_probs[1, j],n_rule_preds[j],
@@ -396,7 +401,10 @@ class WMRC(BaseLabelModel):
                     #         alpha=self.binom_ci_fail_pr, method=self.ci_name)
 
             elif self.constraint_type == 'class_accuracy':
-                if method == 'binomial':
+                if not self.use_inequality_consts:
+                    param_probs[1, j, :] = np.diag(conf_mat_y)
+                    param_probs[[0, 2], j, :] = param_probs[1, j, :]
+                elif method == 'binomial':
                     param_probs[1, j, :] = np.diag(conf_mat_y)
                     # don't do the confidence interval on classes where
                     # there were no predictions
@@ -412,7 +420,10 @@ class WMRC(BaseLabelModel):
                     raise ValueError("Unsupervised estimation not implemented"
                             " for class conditional accuracy constraints")
             else:
-                if method == 'binomial':
+                if not self.use_inequality_consts:
+                    param_probs[1, j, :, :] = conf_mat_y
+                    param_probs[[0, 2], j, :, :] = param_probs[1, j, :, :]
+                elif method == 'binomial':
                     param_probs[1, j, :, :] = conf_mat_y
                     for l in range(self.n_class):
                         # don't do the confidence interval on classes where
