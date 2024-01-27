@@ -95,7 +95,9 @@ def run_wmrc(
     label_model = WMRC(solver=solver, conf_solver=conf_solver, verbose=verbose)
 
     for run_no in range(n_runs):
-        if not replot:
+        if replot:
+            mdic = sio.loadmat(os.path.join(save_path, result_filename))
+        else:
             if n_runs > 1:
                 logger.info('------------Run Number %d------------', run_no + 1)
             n_fit_runs = 0
@@ -165,6 +167,9 @@ def run_wmrc(
                         "avg_num_labeled_per_rule": [],
                         "fit_elapsed_time": [],
                         "wmrc_xent_ub": [],
+                        'uncertainty_approximation_bound': [],
+                        'epsilon_l_inf': [],
+                        'epsilon_l1': [],
                         }
                 if n_classes == 2:
                     mdic["x_calibration_train"] = []
@@ -238,8 +243,36 @@ def run_wmrc(
                         acc_test, 1 - acc_test)
                 logger.info('test log loss: %.4f', logloss_test)
                 logger.info('test brier score: %.4f', brier_score_test)
+
+        # compute the l1 and l inf norms of the epsilons
+        class_freq_eps_scaled = label_model.class_freq_eps / label_model.n_pts
+        param_eps_scaled = label_model.param_eps / label_model.n_preds_per_rule
+        eps_concat = np.concatenate((class_freq_eps_scaled, param_eps_scaled))
+        # l1 = np.linalg.norm(eps_concat, ord=1)
+        l_inf = np.linalg.norm(eps_concat, ord=np.inf)
+        # mdic["epsilon_l1"].append(l1)
+        mdic["epsilon_l_inf"].append(l_inf)
+
+        # try to load the oracle results
+        oracle_filename = get_result_filename(dataset,
+                constraint_form, 'train', 'binomial', False, add_mv_const)
+        oracle_filename_full = os.path.join(save_path, oracle_filename)
+
+        oracle_res_exist = os.path.isfile(oracle_filename_full)
+
+        if oracle_res_exist:
+            oracle_mdic = sio.loadmat(oracle_filename_full)
         else:
-            mdic = sio.loadmat(os.path.join(save_path, result_filename))
+            oracle_mdic = None
+            logger.info('oracle results not found, won\'t compute bound')
+
+        # compute the derived bound if we can
+        if oracle_mdic:
+            mdic['uncertainty_model'] = oracle_mdic['log_loss_train']
+            approx_uncert = np.dot(np.abs(oracle_mdic['class_freq_weights']), class_freq_eps_scaled)
+            approx_uncert += np.dot(np.abs(oracle_mdic['rule_weights']), param_eps_scaled)
+            approx_uncert *= 2
+            mdic['uncertainty_approximation_bound'].append(approx_uncert)
 
         # get confidences if it's oracle, or when 100 labeled points from
         # the validation set are used.  also must not add MV constraint
@@ -257,18 +290,9 @@ def run_wmrc(
             # second return value are the mean predictions for each group
             # third return value is the mean ground truth labels for each group
 
-            # try to load the oracle results
-            oracle_filename = get_result_filename(dataset,
-                    constraint_form, 'train', 'binomial', False, add_mv_const)
-            oracle_filename_full = os.path.join(save_path, oracle_filename)
-
-            oracle_res_exist = os.path.isfile(oracle_filename_full)
             combine_intervals = oracle_res_exist and not is_oracle
 
-            if combine_intervals:
-                oracle_mdic = sio.loadmat(oracle_filename_full)
-            else:
-                oracle_mdic = None
+            if not combine_intervals:
                 logger.info('oracle results not found, won\'t combine graphs')
 
             # try to load eta if it's in the dataset
@@ -973,6 +997,7 @@ if __name__ == '__main__':
         # wrench datasets
         datasets += ['aa2', 'basketball', 'breast_cancer', 'cardio', 'domain',\
                'imdb', 'obs', 'sms', 'yelp', 'youtube']
+        # datasets = ['aa2', 'domain']
         # crowdsourcing datasets
         # datasets += ['bird', 'rte', 'dog', 'web']
 
