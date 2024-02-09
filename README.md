@@ -90,6 +90,10 @@ We have also included some code to visualize the predictions of each method (for
 
     `python3 plot_calibration.py`
 
+    If one wants the calibration for individual ruls from methods run 10 times, then they either need to change how the calibration results are saved in each run_* file.
+    Essentially, one would need to save the result of each run as its own variable.
+    Or, the calibration can be computed in `plot_calibration.py` by using the stored predictions.
+
 - Absention vs Accuracy
 
     This creates a plot that shows how accurate the predictions are on a subset of datapoints.
